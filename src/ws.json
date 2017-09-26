@@ -1,0 +1,18 @@
+{
+    users: [
+        [
+            "54595529WOIHGBUD6728"
+        ]
+    ],
+
+    urls: [
+        {
+            protocol: "ws",
+            req: "?encoding=text",
+        },
+        {
+            req: "hello",
+            resp: "hello"
+        }
+    ]
+}

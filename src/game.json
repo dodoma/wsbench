@@ -1,0 +1,53 @@
+{
+    users: [
+        [
+            {uuid: "736bc9635dc57a77851459b9d5215371", ticket: "273543KVWOSNDKQK5C8F"}
+        ]
+    ],
+
+    urls: [
+        {
+            protocol: "http",
+            req: "/socket.io/?EIO=3&transport=polling&t=Lv-${__randid}",
+            resp: '"sid":"(.{10,}?)".*',
+            save_var: ["sid"]
+        },
+        {
+            protocol: "http",
+            req: "/socket.io/?EIO=3&transport=polling&t=Lv-${__randid}&sid=${sid}",
+            resp: ".{2,}"
+        },
+        {
+            protocol: "ws",
+            req: "/socket.io/?EIO=3&transport=websocket&sid=${sid}",
+        },
+        {
+            req: "2probe",
+            resp: "3probe"
+        },
+        {
+            req: "5"
+        },
+        {
+            protocol: "post",
+            req: "/socket.io/?EIO=3&transport=polling&t=Lv-${__randid}&sid=${sid}",
+            payload: '173:42["message","\u0000\u0000\u0000\u0003\u001cconnector.entryHandler.enter{\"uid\":\"${_uuid}\",\"areaId\":\"area-4024\",\"timestamp\":${_ts}}"]',
+            resp: '{.*}'
+        },
+        {
+            req: '42["message","\u0000\u0000\u0000\u0004\u0018game.gameHandler.request{\"action\":\"signUser\",\"data\":{\"areaId\":\"area-4024\",\"invoker\":\"ddz\",\"ticket\":\"${_ticket}\"},\"timestamp\":${_ts}}"]',
+            resp: '{"id":.*}'
+        },
+        {
+            req: '42["message","\u0000\u0000\u0000\t\u0018game.gameHandler.request{\"action\":\"queryMessage\",\"timestamp\":1505373902210}"]',
+            resp: '斗地主即将上线.*'
+        },
+    ],
+
+    callbacks: [
+        {
+            resp: 'onPlay.*',
+            req: false
+        }
+    ]
+}
