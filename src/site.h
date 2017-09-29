@@ -1,7 +1,8 @@
 #ifndef __SITE_H__
 #define __SITE_H__
 
-int  site_connect(MDF *snode);
-bool site_request(int fd, char *uid, char *ticket, MDF *sitenode, MDF *snode);
+bool site_request(char *uid, char *ticket, MDF *sitenode, MDF *snode, int *fd, MDF *vnode);
+
+bool site_room_init(int fd, MDF *sitenode, MDF *roomnode, int usersn);
 
 #endif

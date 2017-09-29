@@ -25,7 +25,7 @@ void set_conio_terminal_mode()
 
 int kbdhit()
 {
-    struct timeval tv = {0L, 0L};
+    struct timeval tv = {1L, 0L};
     fd_set rdfs;
 
     FD_ZERO(&rdfs);

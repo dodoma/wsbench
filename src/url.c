@@ -1,77 +1,5 @@
 #include "reef.h"
 
-char* url_http_build(const char *host, int port, const char *url)
-{
-    if (port == 0) port = 80;
-
-    MSTR str;
-
-    mstr_init(&str);
-
-    mstr_appendf(&str, "GET %s HTTP/1.1\r\n\r\n", url);
-
-    return str.buf;
-}
-
-char* url_http_post_build(const char *host, int port, const char *url, const char *payload)
-{
-    if (port == 0) port = 80;
-
-    MSTR str;
-
-    mstr_init(&str);
-
-    mtc_mt_dbg("post %s", url);
-    mtc_mt_dbg("post %s", payload);
-
-    mstr_appendf(&str, "POST %s HTTP/1.1\r\n"
-                 "Content-Length: 177\r\n\r\n"
-                 "%s",
-                 url, payload);
-
-    return str.buf;
-}
-
-char* url_ws_build(const char *host, int port, const char *url)
-{
-    if (port == 0) port = 443;
-    MSTR str;
-
-    mstr_init(&str);
-
-    unsigned char clientid[16];
-    char sendid[25];
-
-    for (int i = 0; i < 16; i++) {
-        clientid[i] = mos_rand(127);
-    }
-    mb64_encode(clientid, 16, sendid, 25);
-
-#if 0
-    return
-        "GET / HTTP/1.1\r\n"
-        "Sec-WebSocket-Version: 13\r\n"
-        "Sec-WebSocket-Key: WybDdhLLaKbABqrZGMdw3g==\r\n"
-        "Connection: Upgrade\r\n"
-        "Upgrade: websocket\r\n"
-        "Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n"
-        "Host: echo.websocket.org\r\n\r\n";
-#else
-    mstr_appendf(&str,
-                 "GET %s HTTP/1.1\r\n"
-                 "Sec-WebSocket-Version: 13\r\n"
-                 "Sec-WebSocket-Key: %s\r\n"
-                 "Connection: Upgrade\r\n"
-                 "Upgrade: websocket\r\n"
-                 "Host: echo.websocket.org\r\n"
-                 "Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n\r\n", url, sendid);
-
-    return str.buf;
-
-#endif
-
-}
-
 char* url_var_replace(const char *src, MDF *vnode)
 {
     MERR *err;
@@ -97,7 +25,14 @@ char* url_var_replace(const char *src, MDF *vnode)
             pstart = ep + 1;
 
             snprintf(key, sizeof(key), "%.*s", (int)(ep - sp), sp);
-            mstr_append(&str, mdf_get_value_stringfy(vnode, key, NULL));
+            if (mdf_path_exist(vnode, key)) {
+                mstr_append(&str, mdf_get_value_stringfy(vnode, key, NULL));
+            } else {
+                mstr_append(&str, "${");
+                mstr_appendn(&str, sp, (ep - sp));
+                mstr_append(&str, "}");
+            }
+
         } else break;
     }
 
@@ -113,7 +48,6 @@ bool url_var_save(MDF *vnode, const char *resp, MDF *save_var, const char *recv_
     MERR *err;
 
     if (!resp) return true;
-    if (!save_var || mdf_child_count(save_var, NULL) <= 0) return true;
 
     if (!vnode || !recv_buf) return false;
 
@@ -125,8 +59,10 @@ bool url_var_save(MDF *vnode, const char *resp, MDF *save_var, const char *recv_
     const char *sp, *ep;
     sp = ep = NULL;
 
+    //mtc_mt_dbg("xxxx %s", recv_buf);
+
     if (!mre_match(reo, recv_buf, false)) {
-        mtc_mt_err("match %s failure", recv_buf);
+        mtc_mt_warn("match %s %s failure", resp, recv_buf);
         return false;
     }
 

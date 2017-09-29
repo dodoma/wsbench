@@ -1,0 +1,4 @@
+wsbench
+.depend
+*.o
+*~
