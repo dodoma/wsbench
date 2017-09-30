@@ -26,7 +26,9 @@ char* url_var_replace(const char *src, MDF *vnode)
 
             snprintf(key, sizeof(key), "%.*s", (int)(ep - sp), sp);
             if (mdf_path_exist(vnode, key)) {
-                mstr_append(&str, mdf_get_value_stringfy(vnode, key, NULL));
+                char *value = mdf_get_value_stringfy(vnode, key, NULL);
+                mstr_append(&str, value);
+                mos_free(value);
             } else {
                 mstr_append(&str, "${");
                 mstr_appendn(&str, sp, (ep - sp));
@@ -45,6 +47,12 @@ char* url_var_replace(const char *src, MDF *vnode)
 
 bool url_var_save(MDF *vnode, const char *resp, MDF *save_var, const char *recv_buf)
 {
+#define RETURN(ret)                             \
+    do {                                        \
+        mre_destroy(&reo);                      \
+        return (ret);                           \
+    } while (0)
+
     MERR *err;
 
     if (!resp) return true;
@@ -63,7 +71,7 @@ bool url_var_save(MDF *vnode, const char *resp, MDF *save_var, const char *recv_
 
     if (!mre_match(reo, recv_buf, false)) {
         mtc_mt_warn("match %s %s failure", resp, recv_buf);
-        return false;
+        RETURN(false);
     }
 
     int sn = 1;
@@ -75,13 +83,11 @@ bool url_var_save(MDF *vnode, const char *resp, MDF *save_var, const char *recv_
             mdf_set_valuef(vnode, "%s=%.*s", key, (int)(ep - sp), sp);
         } else {
             mtc_mt_err("get resp for %d %s failure", sn, key);
-            return false;
+            RETURN(false);
         }
 
         cnode = mdf_node_next(cnode);
     }
 
-    mre_destroy(&reo);
-
-    return true;
+    RETURN(true);
 }

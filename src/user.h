@@ -3,10 +3,14 @@
 
 typedef struct _wb_user {
     int fd;
+
+    int usersn;
     char *uid;
     char *ticket;
-    MDF *roomnode;
-    MDF *callback;
+    MDF *sitenode;              /* public memory */
+    MDF *callback;              /* private memory */
+
+    struct _wb_room *room;
 
     unsigned char *rcvbuf;
     size_t rcvlen;
@@ -19,8 +23,32 @@ typedef struct _wb_user {
     struct _wb_user *next;
 } WB_USER;
 
-WB_USER* user_add(WB_USER *next, int fd, char *uid, char *ticket,
-                  MDF *roomnode, MDF *callback, int usersn);
-void     user_destroy(WB_USER *user);
+typedef struct _wb_room {
+    uint32_t turncount;
+    uint32_t usercount;
+    MDF *inode;
+    int state;
+
+    WB_USER *user;
+
+    struct _wb_room *next;
+} WB_ROOM;
+
+enum {
+    ROOM_STATE_INIT = 0,
+    ROOM_STATE_READY,
+    ROOM_STATE_RUNNING,
+    ROOM_STATE_FAILURE,
+    ROOM_STATE_GAMEOVER,
+    ROOM_STATE_CLOSED
+};
+
+WB_ROOM* user_room_open(WB_ROOM *next, char *uid, char *ticket,
+                        MDF *sitenode, int usersn);
+bool user_room_add(WB_ROOM *room, char *uid, char *ticket,
+                   MDF *sitenode, int usersn, int usernumber);
+
+void user_room_check(WB_ROOM *room, int efd);
+void user_room_destroy(WB_ROOM *room);
 
 #endif

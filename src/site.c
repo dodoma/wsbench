@@ -1,3 +1,4 @@
+
 #include "reef.h"
 
 #include <sys/types.h>
@@ -14,13 +15,13 @@
 
 #define BUFFER_LEN 10240
 
-static int _connect(MDF *snode)
+static int _connect(MDF *sitenode)
 {
-    if (!snode) return -1;
+    if (!sitenode) return -1;
 
-    char *ip = mdf_get_value(snode, "ip", "127.0.0.1");
-    int port = mdf_get_int_value(snode, "port", 0);
-    int timeout = mdf_get_int_value(snode, "timeout", 0);
+    char *ip = mdf_get_value(sitenode, "server.ip", "127.0.0.1");
+    int port = mdf_get_int_value(sitenode, "server.port", 0);
+    int timeout = mdf_get_int_value(sitenode, "server.timeout", 0);
 
     mtc_mt_dbg("connect to %s %d %d", ip, port, timeout);
 
@@ -53,7 +54,7 @@ static int _connect(MDF *snode)
     return fd;
 }
 
-bool site_request(char *uid, char *ticket, MDF *sitenode, MDF *snode, int *fd, MDF *vnode)
+bool site_request(char *uid, char *ticket, MDF *sitenode, int *fd, MDF *vnode)
 {
     if (!uid || !sitenode) return false;
 
@@ -87,7 +88,7 @@ bool site_request(char *uid, char *ticket, MDF *sitenode, MDF *snode, int *fd, M
 
         if (method && !strcmp(method, "ws init")) {
             if (wsfd <= 0) {
-                wsfd = _connect(snode);
+                wsfd = _connect(sitenode);
                 if (wsfd <= 0) {
                     mtc_mt_err("connect to server falure");
                     return false;
@@ -109,7 +110,7 @@ bool site_request(char *uid, char *ticket, MDF *sitenode, MDF *snode, int *fd, M
             lfd = wsfd;
             app_ws_send(lfd, req);
         } else {
-            lfd = _connect(snode);
+            lfd = _connect(sitenode);
             if (lfd <= 0) {
                 mtc_mt_err("connect to server failure");
                 return false;
@@ -174,6 +175,7 @@ bool site_room_init(int fd, MDF *sitenode, MDF *roomnode, int usersn)
     int retry;
 
     unsigned char recv_buf[BUFFER_LEN];
+
 
     MDF *cnode = mdf_get_childf(sitenode, "room.actions.%d", usersn);
     while (cnode) {

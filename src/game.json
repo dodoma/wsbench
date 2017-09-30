@@ -1,29 +1,10 @@
 {
+    server: {ip: "172.18.27.89", port: 3950, timeout: 2},
     users: [
         [
-            {uuid: "736bc9635dc57a77851459b9d5215371", ticket: "3947OWHGWOZQFBNDC8EE"}, // 180 7311 1111
-            {uuid: "1250492b98fd2b0195a659bb7dc2896d", ticket: "1141118BWOLBMLIQ24F3"},
-            {uuid: "d9ac2aae2373822b03df59915f9f5739", ticket: "8275OQ8BWOAVZHML9F5C"},
-
-            {uuid: "b99255f88a99c4b8f2a359b9d6b312f4", ticket: "1046KB4XWOUVPVCKC7FE"}, // 2222
-            {uuid: "ac27ea501c7f63628bd459914ce974b4", ticket: "3353M28BWOMLIMJP36B2"},
-            {uuid: "7a59c472836a190f4888599aa865de05", ticket: "9855Q88BWOMBPIVM4121"},
-
-            {uuid: "42107b02811b489e34b359b9d6839e88", ticket: "6952UAIXWOURJGOL9953"}, // 3333
-            {uuid: "2817e4859aa828c5c16d59915ef04960", ticket: "18332E8BWOPJYBOL539B"},
-            {uuid: "d6de46f6df1878eafce859915ec92762", ticket: "XX28MM8BWODPBXCQBA53"},
-
-            {uuid: "b7d8e7577e4f20d96d1659b9d6aebaec", ticket: "5612FYHZWOEIAPWD0E1E"}, // 4444
-            {uuid: "5d624da371c6106022dc59915fa2c529", ticket: "9818BS8BWOZSXHDM7700"},
-            {uuid: "9536d1dda3734300e6fb59bbf93d9089", ticket: "6307NJWBWORMFMMLA883"},
-
-            {uuid: "21e7cc6f01a4c6a21b39599bdb852ce0", ticket: "1883E1CGWOQBCJJMA4F8"}, // 9552
-            {uuid: "8b7b055de3f3b83b604959bb8270ee2b", ticket: "6159S29BWOXJGQUK0FB6"},
-            {uuid: "51b631a7f129148d354059bb870d3c73", ticket: "3502K0ABWOLPKPQK92C9"},
-
-            {uuid: "e53cc12f26c9f6a249fd59b9d637d496", ticket: "487260IZWOCRMVBL9F15"}, // 5555
-            {uuid: "b84036e82ec90979d43c59bb82f6fabd", ticket: "7786839BWOMEZNXP8048"},
-            {uuid: "96030dd3b330dd385dc859bb8288236b", ticket: "6512919BWOHYMHHQBFDB"},
+            {uuid: '736bc9635dc57a77800009b9d5214001', ticket: '145732B1XOEMTOHQ6247'},
+            {uuid: '736bc9635dc57a77800009b9d5214002', ticket: '145832B1XOWAUZVMA717'},
+            {uuid: '736bc9635dc57a77800009b9d5214003', ticket: '145832B1XOWMVNNRA7F2'},
         ]
     ],
 

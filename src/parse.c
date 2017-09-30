@@ -6,7 +6,7 @@
 #include "url.h"
 #include "app.h"
 
-#define TCP_PACKET_MAX_LEN 104857600
+#define TCP_PACKET_MAX_LEN 1048576
 
 enum {
     OP_STREAM = 0,
@@ -17,7 +17,7 @@ enum {
     OP_PONG
 };
 
-static int _parse_text_event(WB_USER *user)
+static void _parse_text_event(WB_USER *user)
 {
     MERR *err;
 
@@ -43,15 +43,17 @@ static int _parse_text_event(WB_USER *user)
             if (count > 1) mdf_add_int_value(cnode, "count", -1);
             else {
                 if (req) {
-                    req = url_var_replace(req, user->roomnode);
+                    req = url_var_replace(req, user->room->inode);
                     app_ws_send(user->fd, req);
                     mos_free(req);
 
                     mdf_set_bool_value(cnode, "old", true);
 
                     if (mdf_get_bool_value(cnode, "over", false) == true) {
-                        mre_destroy(&reo);
-                        return 0;
+                        user->room->usercount--;
+                        if (user->room->usercount <= 0) {
+                            user->room->state = ROOM_STATE_GAMEOVER;
+                        }
                     }
                 }
             }
@@ -65,11 +67,9 @@ static int _parse_text_event(WB_USER *user)
     mre_destroy(&reo);
 
     if (!cnode) mtc_mt_warn("%s unknown message %s", user->uid, user->payload);
-
-    return 1;
 }
 
-static int _parse_packet(WB_USER *user, bool finish)
+static void _parse_packet(WB_USER *user, bool finish)
 {
     unsigned char ptmp;
 
@@ -80,7 +80,7 @@ static int _parse_packet(WB_USER *user, bool finish)
         ptmp = user->payload[user->payloadsize];
         user->payload[user->payloadsize] = '\0';
 
-        if (_parse_text_event(user) == 0) return 0;
+        _parse_text_event(user);
 
         mtc_mt_noise("text: %s", user->payload);
 
@@ -101,15 +101,13 @@ static int _parse_packet(WB_USER *user, bool finish)
     default:
         mtc_mt_err("opcode not support yet");
     }
-
-    return 1;
 }
 
-int parse_buf(WB_USER *user, unsigned char *buf, size_t len)
+void parse_buf(WB_USER *user, unsigned char *buf, size_t len)
 {
     uint32_t totaltoget = 0;
 
-    if (!user || !buf) return -1;
+    if (!user || !buf) return;
 
     unsigned char *pos = buf;
     totaltoget = 1;
@@ -157,11 +155,11 @@ int parse_buf(WB_USER *user, unsigned char *buf, size_t len)
 
     if (totaltoget > len) {
         if (user->rcvbuf == NULL) {
-            user->rcvbuf = mos_malloc(TCP_PACKET_MAX_LEN);
+            user->rcvbuf = mos_calloc(1, TCP_PACKET_MAX_LEN);
             memcpy(user->rcvbuf, buf, len);
         }
         user->rcvlen = len;
-        return -1;
+        return;
     }
 
     if (totaltoget < len) {
@@ -169,26 +167,28 @@ int parse_buf(WB_USER *user, unsigned char *buf, size_t len)
         len = totaltoget;
     }
 
-    if (_parse_packet(user, finish) == 0) return 0;
+    _parse_packet(user, finish);
 
     if (user->excess) {
         memmove(buf, buf + len, user->excess);
         user->rcvlen = user->excess;
         user->excess = 0;
 
-        return parse_buf(user, buf, user->rcvlen);
+        parse_buf(user, buf, user->rcvlen);
+        return;
     }
 
     mos_free(user->rcvbuf);
+    user->rcvbuf = NULL;
     user->rcvlen = 0;
     user->excess = 0;
 
     user->payload = NULL;
     user->payloadsize = 0;
 
-    return 1;
+    return;
 
 error_exit:
     close(user->fd);
-    return 0;
+    return;
 }

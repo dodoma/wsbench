@@ -7,43 +7,46 @@
 #include "app.h"
 #include "parse.h"
 
-#define BUFFER_LEN 10240
-#define MAXEVENTS 64
+#define MAXEVENTS  1024
 
-int poll_create(WB_USER *wb_user)
+struct epoll_event* poll_create(int *fd)
 {
     int efd = epoll_create1(0);
     if (efd < 0) {
         mtc_mt_err("create epoll fd failure");
-        return 0;
+        return NULL;
     }
 
-    WB_USER *user = wb_user;
-    while (user) {
-        struct epoll_event event;
-        event.data.fd = user->fd;
-        event.data.ptr = user;
-        event.events = EPOLLIN | EPOLLET;
+    struct epoll_event *events = mos_calloc(MAXEVENTS, sizeof(struct epoll_event));
 
-        int rv = epoll_ctl(efd, EPOLL_CTL_ADD, user->fd, &event);
-        if (rv < 0) {
-            mtc_mt_err("add epoll fd failure");
-            return 0;
-        }
+    *fd = efd;
 
-        user = user->next;
-    }
-
-    return efd;
+    return events;
 }
 
-int poll_do(int efd, int *usercount)
+bool poll_add(int efd, WB_USER *user)
 {
-    /* TODO move calloc out for better performence */
-    struct epoll_event *events = mos_calloc(MAXEVENTS,
-                                            sizeof(struct epoll_event));
+    if (efd <= 0 || !user || user->fd <= 0) return false;
 
-    unsigned char recv_buf[BUFFER_LEN];
+    struct epoll_event event;
+    // event.data.fd = user->fd;    // event.data 是个 union，此处用 ptr
+    event.data.ptr = user;
+    event.events = EPOLLIN | EPOLLET;
+    if (epoll_ctl(efd, EPOLL_CTL_ADD, user->fd, &event) < 0) return false;
+
+    return true;
+}
+
+void poll_del(int efd, int fd)
+{
+    if (efd <= 0 || fd <= 0) return;
+
+    epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
+}
+
+void poll_do(int efd, struct epoll_event *events,
+             unsigned char *recv_buf, int maxlen)
+{
     char *stringp = NULL;
 
     int n = epoll_wait(efd, events, MAXEVENTS, 2000);
@@ -56,14 +59,19 @@ int poll_do(int efd, int *usercount)
         if ((events[i].events & EPOLLERR) || (events[i].events & EPOLLHUP) ||
             (!(events[i].events & EPOLLIN))) {
             mtc_mt_err("epoll %s error\n", user->uid);
+            poll_del(efd, fd);
             close(fd);
+            user->room->state = ROOM_STATE_CLOSED;
             continue;
         }
 
-        memset(recv_buf, 0x0, BUFFER_LEN);
-        int len = app_recv(fd, recv_buf, BUFFER_LEN, &stringp);
+        memset(recv_buf, 0x0, maxlen);
+        int len = app_recv(fd, recv_buf, maxlen, &stringp);
         if (len == 0) {
             mtc_mt_err("server closed connect");
+            poll_del(efd, fd);
+            close(fd);
+            user->room->state = ROOM_STATE_CLOSED;
             continue;
         } else if (len < 0 && (errno != EAGAIN && errno != EWOULDBLOCK)) {
             mtc_mt_err("unknown error on receive %s %d %d %s",
@@ -72,22 +80,17 @@ int poll_do(int efd, int *usercount)
         }
 
         if (user->rcvbuf == NULL) {
-            if (parse_buf(user, recv_buf, len) == 0) *usercount = *usercount - 1;
+            parse_buf(user, recv_buf, len);
         } else {
             memcpy(user->rcvbuf + user->rcvlen, recv_buf, len);
             user->rcvbuf += len;
-            if (parse_buf(user, user->rcvbuf, user->rcvlen) == 0) *usercount = *usercount - 1;
+            parse_buf(user, user->rcvbuf, user->rcvlen);
         }
     }
-
-    mos_free(events);
-
-    if (*usercount <= 0) return 0;
-
-    return 1;
 }
 
-void poll_destroy(int efd)
+void poll_destroy(int efd, struct epoll_event *events)
 {
+    mos_free(events);
     close(efd);
 }
