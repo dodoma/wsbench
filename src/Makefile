@@ -9,7 +9,10 @@ DEPEND = .depend
 INCS = $(INCBASE) $(INC_LOCAL)
 LIBS = $(LIBBASE) $(LIB_LOCAL)
 
-all: wsbench
+all: preload wsbench
+
+preload:
+	@$(MAKE) -C $(BASEDIR)/src
 
 $(DEPEND): $(SOURCES)
 	@$(CC) $(CFLAGS) $(INCS) -MM $^ > $@

@@ -1,4 +1,9 @@
 {
+    max_threadnum: 10,
+    trace: {
+        file: "-",
+        level: "error"
+    },
     sites: [
         {name: "game"}
         //{name: 'ws', ip: "echo.websocket.org", port: 80, timeout: 2}

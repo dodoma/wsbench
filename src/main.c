@@ -6,7 +6,7 @@
 #include "poll.h"
 #include "app.h"
 
-#define MAX_THREAD_NUM 9
+#define MAX_THREAD_NUM 100
 
 #define BUFFER_LEN 10240        /* receive message buffer */
 
@@ -25,9 +25,10 @@ static void* _bench_do(void *arg)
 
     int threadsn = *(int*)arg;
 
-    char fname[PATH_MAX];
-    snprintf(fname, sizeof(fname), "logs/%04d.log", threadsn);
-    mtc_mt_init("-", MTC_ERROR);
+    char fname[PATH_MAX] = {0};
+    if (!strcmp(mdf_get_value(g_cfg, "trace.file", "+"), "-")) sprintf(fname, "-");
+    else snprintf(fname, sizeof(fname), "logs/%03d.log", threadsn);
+    mtc_mt_init(fname, mtc_level_str2int(mdf_get_value(g_cfg, "trace.level", "debug")));
     mtc_mt_dbg("I am bencher %d", threadsn);
 
     WB_ROOM *wb_room;
@@ -44,7 +45,7 @@ static void* _bench_do(void *arg)
 
         mtc_mt_dbg("init site %s", sitename);
 
-        /* TODO memory leak, but don't care */
+        /* memory leak, but don't care */
         mdf_init(&sitenode);
         err = mdf_json_import_filef(sitenode, "%s.json", sitename);
         RETURN_V_NOK(err, NULL);
@@ -123,13 +124,17 @@ int main(int argc, char *argv[])
     err = mdf_json_import_file(g_cfg, g_config_filename);
     DIE_NOK(err);
 
-    mtc_init("-", MTC_DEBUG);
+    int threadnum = mdf_get_int_value(g_cfg, "max_threadnum", 1);
+    if (threadnum > MAX_THREAD_NUM) threadnum = MAX_THREAD_NUM;
+
+    mtc_init(mdf_get_value(g_cfg, "trace.file", "-"),
+             mtc_level_str2int(mdf_get_value(g_cfg, "trace.level", "debug")));
 
     set_conio_terminal_mode();
 
-    pthread_t *threads[MAX_THREAD_NUM];
-    int num[MAX_THREAD_NUM];
-    for (int i = 0; i < MAX_THREAD_NUM; i++) {
+    pthread_t *threads[threadnum];
+    int num[threadnum];
+    for (int i = 0; i < threadnum; i++) {
         threads[i] = mos_calloc(1, sizeof(pthread_t));
         num[i] = i;
     }
@@ -138,7 +143,7 @@ int main(int argc, char *argv[])
 
     g_ctime = time(NULL);
 
-    for (int i = 0; i < MAX_THREAD_NUM; i++) {
+    for (int i = 0; i < threadnum; i++) {
         pthread_create(threads[i], NULL, _bench_do, (void*)&num[i]);
     }
 
@@ -156,7 +161,7 @@ int main(int argc, char *argv[])
         g_ctime = time(NULL);
     }
 
-    for (int i = 0; i < MAX_THREAD_NUM; i++) {
+    for (int i = 0; i < threadnum; i++) {
         pthread_join(*threads[i], NULL);
         mos_free(threads[i]);
     }
