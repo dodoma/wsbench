@@ -3,6 +3,9 @@
 #include "user.h"
 #include "poll.h"
 #include "site.h"
+#include "app.h"
+
+extern time_t g_ctime;
 
 static WB_USER* _user_add(char *uid, char *ticket, MDF *sitenode, int usersn)
 {
@@ -64,6 +67,10 @@ WB_ROOM* user_room_open(WB_ROOM *next, char *uid, char *ticket,
     mdf_init(&room->inode);
     room->user = user;
     user->room = room;
+
+    room->hb_last = g_ctime;
+    room->hb_interval = mdf_get_int_value(sitenode, "heartbeat.interval", 15);
+    room->hb_message = mdf_get_value(sitenode, "heartbeat.message", "ping");
 
     room->next = next;
 
@@ -202,6 +209,20 @@ void user_room_check(WB_ROOM *room, int efd)
             }
 
             room->state = ROOM_STATE_READY;
+        }
+
+        /*
+         * heartbeat
+         */
+        if (g_ctime > (room->hb_last + room->hb_interval)) {
+            room->hb_last = g_ctime;
+
+            user = room->user;
+            while (user) {
+                if (user->fd > 0) app_ws_send(user->fd, room->hb_message);
+
+                user = user->next;
+            }
         }
 
         room = room->next;

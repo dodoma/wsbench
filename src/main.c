@@ -4,7 +4,6 @@
 #include "site.h"
 #include "user.h"
 #include "poll.h"
-#include "app.h"
 
 #define MAX_THREAD_NUM 100
 
@@ -26,7 +25,7 @@ static void* _bench_do(void *arg)
     int threadsn = *(int*)arg;
 
     char fname[PATH_MAX] = {0};
-    if (!strcmp(mdf_get_value(g_cfg, "trace.file", "+"), "-")) sprintf(fname, "-");
+    if (mdf_get_bool_value(g_cfg, "trace.tostdout", false)) sprintf(fname, "-");
     else snprintf(fname, sizeof(fname), "logs/%03d.log", threadsn);
     mtc_mt_init(fname, mtc_level_str2int(mdf_get_value(g_cfg, "trace.level", "debug")));
     mtc_mt_dbg("I am bencher %d", threadsn);
@@ -86,26 +85,10 @@ static void* _bench_do(void *arg)
         return NULL;
     }
 
-    time_t last_heartbeat = g_ctime;
     while (!dad_call_me_back) {
-
         user_room_check(wb_room, efd);
 
         poll_do(efd, events, recv_buf, BUFFER_LEN);
-
-        if (g_ctime > (last_heartbeat + 25)) {
-            last_heartbeat = g_ctime;
-
-            WB_ROOM *room = wb_room;
-            while (room) {
-                WB_USER *user = room->user;
-                while (user) {
-                    if (user->fd > 0) app_ws_send(user->fd, "2");
-                    user = user->next;
-                }
-                room = room->next;
-            }
-        }
     }
 
     poll_destroy(efd, events);
@@ -127,8 +110,7 @@ int main(int argc, char *argv[])
     int threadnum = mdf_get_int_value(g_cfg, "max_threadnum", 1);
     if (threadnum > MAX_THREAD_NUM) threadnum = MAX_THREAD_NUM;
 
-    mtc_init(mdf_get_value(g_cfg, "trace.file", "-"),
-             mtc_level_str2int(mdf_get_value(g_cfg, "trace.level", "debug")));
+    mtc_init("-", mtc_level_str2int(mdf_get_value(g_cfg, "trace.level", "debug")));
 
     set_conio_terminal_mode();
 

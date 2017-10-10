@@ -31,6 +31,11 @@ typedef struct _wb_room {
 
     WB_USER *user;
 
+    /* heartbeat */
+    time_t hb_last;
+    int    hb_interval;
+    char  *hb_message;
+
     struct _wb_room *next;
 } WB_ROOM;
 

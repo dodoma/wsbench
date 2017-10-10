@@ -1,10 +1,14 @@
 {
     server: {ip: "172.18.27.89", port: 3950, timeout: 2},
+    heartbeat: {
+        interval: 25,
+        message: "2"
+    },
     users: [
         [
-            {uuid: '736bc9635dc57a77800009b9d5214001', ticket: '145732B1XOEMTOHQ6247'},
-            {uuid: '736bc9635dc57a77800009b9d5214002', ticket: '145832B1XOWAUZVMA717'},
-            {uuid: '736bc9635dc57a77800009b9d5214003', ticket: '145832B1XOWMVNNRA7F2'},
+            {uuid: '736bc9635dc57a77800009b9d5219001', ticket: 'X489FY21XOMJJTUL7C78'},
+            {uuid: '736bc9635dc57a77800009b9d5219002', ticket: 'X489FY21XOTEEJRM8B60'},
+            {uuid: '736bc9635dc57a77800009b9d5219003', ticket: 'X490FY21XOIHDSBLD7F0'},
         ]
     ],
 
