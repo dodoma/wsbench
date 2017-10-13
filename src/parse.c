@@ -44,18 +44,20 @@ static void _parse_text_event(WB_USER *user)
             else {
                 if (req) {
                     req = url_var_replace(req, user->room->inode);
+                    mtc_mt_dbg("request %s", req);
                     app_ws_send(user->fd, req);
                     mos_free(req);
+                }
 
-                    mdf_set_bool_value(cnode, "old", true);
-
-                    if (mdf_get_bool_value(cnode, "over", false) == true) {
-                        user->room->usercount--;
-                        if (user->room->usercount <= 0) {
-                            user->room->state = ROOM_STATE_GAMEOVER;
-                        }
+                if (mdf_get_bool_value(cnode, "over", false) == true) {
+                    user->room->usercount--;
+                    mtc_mt_dbg("game over for user %s remain user: %d", user->uid, user->room->usercount);
+                    if (user->room->usercount <= 0) {
+                        user->room->state = ROOM_STATE_GAMEOVER;
                     }
                 }
+
+                mdf_set_bool_value(cnode, "old", true);
             }
 
             break;
@@ -80,9 +82,9 @@ static void _parse_packet(WB_USER *user, bool finish)
         ptmp = user->payload[user->payloadsize];
         user->payload[user->payloadsize] = '\0';
 
-        _parse_text_event(user);
-
         mtc_mt_noise("text: %s", user->payload);
+
+        _parse_text_event(user);
 
         user->payload[user->payloadsize] = ptmp;
         break;

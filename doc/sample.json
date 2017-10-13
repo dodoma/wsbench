@@ -1,0 +1,112 @@
+{
+    server: {ip: "doudizhu.mygame.net", port: 3000, timeout: 2},
+    heartbeat: {interval: 25, message: "2"},
+    users: [
+        [
+            {uuid: '736bc9635dc57a77800009b9d5219001', ticket: 'X489FY21XOMJJTUL7C78'},
+            {uuid: '736bc9635dc57a77800009b9d5219002', ticket: 'X489FY21XOTEEJRM8B60'},
+            {uuid: '736bc9635dc57a77800009b9d5219003', ticket: 'X490FY21XOIHDSBLD7F0'},
+            {uuid: '736bc9635dc57a77800009b9d5219004', ticket: 'X490FY21XOYNWWBDE656'}
+        ]
+    ],
+
+    urls: [
+        {
+            method: "get",
+            req: "/socket.io/?EIO=3&transport=polling&t=${__randid}",
+            resp: '"sid":"(.{10,}?)".*',
+            save_var: ["sid"]
+        },
+        {
+            method: "get",
+            req: "/socket.io/?EIO=3&transport=polling&t=${__randid}&sid=${sid}",
+            resp: ".{2,}"
+        },
+        {
+            method: "ws init",
+            req: "/socket.io/?EIO=3&transport=websocket&sid=${sid}",
+            resp: "Upgrade"
+        },
+        {
+            req: '{"action":"queryMessage","timestamp":${_ts}}',
+            resp: '斗地主即将上线.*'
+        }
+    ],
+
+    room: {
+        usernumber: 3,
+        actions: {
+            0: [
+                {
+                    req: '{"action":"createRoom","data":{"field":{"type":"private","roundCountLimit":8},"timestamp":${_ts}}',
+                    resp: 'number.*:([0-9]{6})',
+                    save_var: ["roomnumber"]
+                }
+            ],
+            1: [
+                {
+                    req: '{"action":"enterRoom","data":{"fieldType":"private","password":"${roomnumber}"},"timestamp":${_ts}}',
+                    resp: 'roundTimesLimit'
+                }
+            ],
+            2: [
+                {
+                    req: '{"action":"enterRoom","data":{"fieldType":"private","password":"${roomnumber}"},"timestamp":${_ts}}',
+                    resp: 'roundTimesLimit'
+                },
+                {
+                    req: '{"action":"readyPlay","timestamp":${_ts}}',
+                    resp: '.{2,}'
+                }
+            ]
+        }
+    },
+
+    callbacks: {
+        0: [
+            {
+                on: 'onUserEnter',
+                count: 2,
+                req: '{"action":"readyPlay","timestamp":${_ts}}'
+            },
+            {
+                on: 'onUserReadyPlay',
+            },
+            {
+                on: 'onGameOver',
+                req: '{"action":"requestCloseRoom","timestamp":${_ts}}'
+            },
+            {
+                on: 'onRoomClosed',
+                req: '{"action":"leaveRoom","timestamp":${_ts}}',
+                over: true
+            },
+        ],
+        1: [
+            {
+                on: 'onUserEnter',
+                req: '{"action":"readyPlay","timestamp":${_ts}}'
+            },
+            {
+                on: 'onUserRequestCloseRoom',
+                req: '{"action":"respondCloseRoom","data":{"agree":true},"timestamp":${_ts}}'
+            },
+            {
+                on: 'onRoomClosed',
+                req: '{"action":"leaveRoom","timestamp":${_ts}}',
+                over: true
+            }
+        ],
+        2: [
+            {
+                on: 'onUserRequestCloseRoom',
+                req: '{"action":"respondCloseRoom","data":{"agree":true},"timestamp":${_ts}}'
+            },
+            {
+                on: 'onRoomClosed',
+                req: '{"action":"leaveRoom","timestamp":${_ts}}',
+                over: true
+            }
+        ]
+    }
+}

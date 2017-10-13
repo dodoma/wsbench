@@ -6,9 +6,7 @@
 #include "poll.h"
 
 #define MAX_THREAD_NUM 100
-
 #define BUFFER_LEN 10240        /* receive message buffer */
-
 #define DEFAULT_CONFIGFILE "./config.json"
 
 MDF  *g_cfg = NULL;
