@@ -83,7 +83,7 @@ bool site_request(char *uid, char *ticket, MDF *sitenode, int *fd, MDF *vnode)
         MDF *save_var = mdf_get_node(cnode, "save_var");
 
         if (!req) return false;
-        req = url_var_replace(req, vnode);
+        req = url_var_replace(req, vnode, NULL);
         retry = 0;
 
         if (method && !strcmp(method, "ws init")) {
@@ -122,7 +122,7 @@ bool site_request(char *uid, char *ticket, MDF *sitenode, int *fd, MDF *vnode)
                 mos_free(ps);
             } else if (!strcmp(method, "post")) {
                 ps = req;
-                payload = url_var_replace(payload, vnode);
+                payload = url_var_replace(payload, vnode, NULL);
                 req = app_http_post_build(req, payload);
                 mos_free(payload);
                 mos_free(ps);
@@ -185,7 +185,7 @@ bool site_room_init(int fd, MDF *sitenode, MDF *roomnode, int usersn)
         MDF *save_var = mdf_get_node(cnode, "save_var");
 
         if (!req) return false;
-        req = url_var_replace(req, roomnode);
+        req = url_var_replace(req, roomnode, NULL);
         retry = 0;
 
         app_ws_send(fd, req);

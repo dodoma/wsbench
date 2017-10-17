@@ -73,6 +73,8 @@ ssize_t app_ws_send(int fd, const char *buf)
 {
     if (fd <= 0 || !buf) return -1;
 
+    mtc_mt_dbg("request %s", buf);
+
     size_t len = strlen(buf);
     unsigned char header[4];
     unsigned char *pos = header;

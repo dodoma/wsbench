@@ -7,6 +7,16 @@
 
 extern time_t g_ctime;
 
+void _lmt_free(void *p)
+{
+    if (!p) return;
+
+    WB_LETMETHINK *lmt = (WB_LETMETHINK*)p;
+
+    mos_free(lmt->buf);
+    mos_free(lmt);
+}
+
 static WB_USER* _user_add(char *uid, char *ticket, MDF *sitenode, int usersn)
 {
     if (!uid || !ticket || !sitenode) return NULL;
@@ -18,6 +28,8 @@ static WB_USER* _user_add(char *uid, char *ticket, MDF *sitenode, int usersn)
     user->ticket = strdup(ticket);
     user->sitenode = sitenode;
     mdf_init(&user->callback);
+    mdf_init(&user->inode);
+    mlist_init(&user->sendlist, _lmt_free);
 
     user->room = NULL;
 
@@ -43,6 +55,8 @@ static void _user_destroy(WB_USER *user)
         mos_free(user->uid);
         mos_free(user->ticket);
         mdf_destroy(&user->callback);
+        mdf_destroy(&user->inode);
+        mlist_destroy(&user->sendlist);
         mos_free(user->rcvbuf);
 
         mos_free(user);
@@ -106,8 +120,6 @@ void user_room_check(WB_ROOM *room, int efd)
     int fd;
     bool roomok;
     WB_USER *user;
-    MDF *vnode;
-    mdf_init(&vnode);
 
     while (room) {
         roomok = true;
@@ -120,19 +132,18 @@ void user_room_check(WB_ROOM *room, int efd)
             while (user) {
                 mtc_mt_foo("init user %d %s", user->usersn, user->uid);
 
+                mdf_clear(user->inode);
                 mdf_clear(user->callback);
-                MDF *callback = mdf_get_nodef(user->sitenode, "callbacks.%d",
-                                              user->usersn);
-                mdf_copy(user->callback, NULL, callback , true);
+                mdf_copy(user->callback, NULL,
+                         mdf_get_nodef(user->sitenode, "callbacks.%d", user->usersn),
+                         true);
 
-                mdf_clear(vnode);
                 if (!site_request(user->uid, user->ticket, user->sitenode,
-                                  &fd, vnode)) {
+                                  &fd, room->inode)) {
                     mtc_mt_err("init urls request for %s failure", user->uid);
                     roomok = false;
                     break;
                 }
-                mdf_copy(room->inode, NULL, vnode, true);
 
                 if (!site_room_init(fd, user->sitenode, room->inode, user->usersn)) {
                     mtc_mt_err("init room info %s failure", user->uid);
@@ -178,6 +189,20 @@ void user_room_check(WB_ROOM *room, int efd)
         } else if (room->state == ROOM_STATE_INIT) {
             mtc_mt_warn("room %s user not enough %d",
                         room->user->uid, room->usercount);
+        } else if (room->state == ROOM_STATE_RUNNING) {
+            user = room->user;
+            while (user) {
+                WB_LETMETHINK *lmt;
+                MLIST_ITERATE(user->sendlist, lmt) {
+                    if (g_ctime >= lmt->shottime) {
+                        app_ws_send(user->fd, lmt->buf);
+                        mlist_delete(user->sendlist, _moon_i);
+                        _moon_i--;
+                    }
+                }
+
+                user = user->next;
+            }
         } else if (room->state == ROOM_STATE_GAMEOVER) {
             room->usercount = 0;
 
@@ -227,8 +252,6 @@ void user_room_check(WB_ROOM *room, int efd)
 
         room = room->next;
     }
-
-    mdf_destroy(&vnode);
 }
 
 void user_room_destroy(WB_ROOM *room)
@@ -241,4 +264,15 @@ void user_room_destroy(WB_ROOM *room)
 
         room = next;
     }
+}
+
+void user_message_append(WB_USER *user, const char *req, int delay)
+{
+    if (!user || user->fd <= 0 || !req || delay <= 0) return;
+
+    WB_LETMETHINK *lmt = mos_calloc(1, sizeof(WB_LETMETHINK));
+    lmt->buf = req;
+    lmt->shottime = g_ctime + delay;
+
+    mlist_append(user->sendlist, lmt);
 }

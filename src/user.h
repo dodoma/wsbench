@@ -1,6 +1,12 @@
 #ifndef __USER_H__
 #define __USER_H__
 
+/* messages that client triggered async, for really user simulation */
+typedef struct _wb_lemethink {
+    const char *buf;
+    time_t shottime;
+} WB_LETMETHINK;
+
 typedef struct _wb_user {
     int fd;
 
@@ -9,6 +15,8 @@ typedef struct _wb_user {
     char *ticket;
     MDF *sitenode;              /* public memory */
     MDF *callback;              /* private memory */
+    MDF *inode;                 /* user request information */
+    MLIST *sendlist;            /* messages to be send */
 
     struct _wb_room *room;
 
@@ -26,7 +34,7 @@ typedef struct _wb_user {
 typedef struct _wb_room {
     uint32_t turncount;
     uint32_t usercount;
-    MDF *inode;
+    MDF *inode;                 /* room request information */
     int state;
 
     WB_USER *user;
@@ -55,5 +63,7 @@ bool user_room_add(WB_ROOM *room, char *uid, char *ticket,
 
 void user_room_check(WB_ROOM *room, int efd);
 void user_room_destroy(WB_ROOM *room);
+
+void user_message_append(WB_USER *user, const char *req, int delay);
 
 #endif

@@ -19,37 +19,43 @@ enum {
 
 static void _parse_text_event(WB_USER *user)
 {
-    MERR *err;
-
-    MRE *reo = mre_init();
-
     MDF *cnode = mdf_get_child(user->callback, NULL);
     while (cnode) {
         char *onstring = mdf_get_value(cnode, "on", NULL);
-        char *req = mdf_get_value(cnode, "req", NULL);
-        int count = mdf_get_int_value(cnode, "count", 1);
+        char *req      = mdf_get_value(cnode, "req", NULL);
+        int count_set  = mdf_get_int_value(cnode, "count", 1);
+        int count_run  = mdf_get_int_value(cnode, "count_run", 0);
+        bool proceed   = mdf_get_bool_value(cnode, "old", false);
+        bool repeat    = mdf_get_bool_value(cnode, "repeat", false);
+        int delay      = mdf_get_int_value(cnode, "delay", 0);
+        bool over      = mdf_get_bool_value(cnode, "over", false);
+        MDF *save_var  = mdf_get_node(cnode, "save_var");
 
-        err = mre_compile(reo, onstring);
-        TRACE_NOK_MT(err);
-
-        if (mre_match(reo, (char*)user->payload, false)) {
+        if (url_var_save(user->inode, onstring, save_var, (char*)user->payload)) {
             mtc_mt_dbg("%s on message %s", user->uid, onstring);
 
-            if (mdf_get_bool_value(cnode, "old", false)) {
+            if (proceed && !repeat && (req || !over)) {
                 mtc_mt_dbg("proceeded");
                 break;
             }
 
-            if (count > 1) mdf_add_int_value(cnode, "count", -1);
+            /* message comed in */
+            count_run++;
+
+            if (count_set > count_run) mdf_set_int_value(cnode, "count_run", count_run);
             else {
                 if (req) {
-                    req = url_var_replace(req, user->room->inode);
-                    mtc_mt_dbg("request %s", req);
-                    app_ws_send(user->fd, req);
-                    mos_free(req);
+                    req = url_var_replace(req, user->room->inode, user->inode);
+                    if (delay == 0) {
+                        app_ws_send(user->fd, req);
+                        mos_free(req);
+                    } else {
+                        /* req async */
+                        user_message_append(user, req, delay);
+                    }
                 }
 
-                if (mdf_get_bool_value(cnode, "over", false) == true) {
+                if (over == true) {
                     user->room->usercount--;
                     mtc_mt_dbg("game over for user %s remain user: %d", user->uid, user->room->usercount);
                     if (user->room->usercount <= 0) {
@@ -57,6 +63,7 @@ static void _parse_text_event(WB_USER *user)
                     }
                 }
 
+                mdf_set_int_value(cnode, "count_run", 0);
                 mdf_set_bool_value(cnode, "old", true);
             }
 
@@ -65,8 +72,6 @@ static void _parse_text_event(WB_USER *user)
 
         cnode = mdf_node_next(cnode);
     }
-
-    mre_destroy(&reo);
 
     if (!cnode) mtc_mt_warn("%s unknown message %s", user->uid, user->payload);
 }
