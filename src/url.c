@@ -71,8 +71,6 @@ bool url_var_save(MDF *vnode, const char *resp, MDF *save_var, const char *recv_
     const char *sp, *ep;
     sp = ep = NULL;
 
-    //mtc_mt_dbg("xxxx %s", recv_buf);
-
     if (!mre_match(reo, recv_buf, false)) {
         RETURN(false);
     }

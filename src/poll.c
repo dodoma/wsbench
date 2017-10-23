@@ -1,13 +1,15 @@
 #include "reef.h"
 
+#include <sys/socket.h>
 #include <sys/epoll.h>
 #include <errno.h>
+#include <fcntl.h>
 
+#include "config.h"
 #include "user.h"
 #include "app.h"
 #include "parse.h"
-
-#define MAXEVENTS  1024
+#include "util.h"
 
 struct epoll_event* poll_create(int *fd)
 {
@@ -28,6 +30,11 @@ bool poll_add(int efd, WB_USER *user)
 {
     if (efd <= 0 || !user || user->fd <= 0) return false;
 
+    /*
+     * don't care about receive/send timeout on poll
+     */
+    fcntl(user->fd, F_SETFL, fcntl(user->fd, F_GETFL, 0) | O_NONBLOCK);
+
     struct epoll_event event;
     // event.data.fd = user->fd;    // event.data 是个 union，此处用 ptr
     event.data.ptr = user;
@@ -47,8 +54,6 @@ void poll_del(int efd, int fd)
 void poll_do(int efd, struct epoll_event *events,
              unsigned char *recv_buf, int maxlen)
 {
-    char *stringp = NULL;
-
     int n = epoll_wait(efd, events, MAXEVENTS, 2000);
     for (int i = 0; i < n; i++) {
         WB_USER *user = (WB_USER*)events[i].data.ptr;
@@ -66,7 +71,7 @@ void poll_do(int efd, struct epoll_event *events,
         }
 
         memset(recv_buf, 0x0, maxlen);
-        int len = app_recv(fd, recv_buf, maxlen, &stringp);
+        int len = recv(fd, recv_buf, maxlen, 0);
         if (len == 0) {
             mtc_mt_err("server closed connect");
             poll_del(efd, fd);
@@ -79,11 +84,21 @@ void poll_do(int efd, struct epoll_event *events,
             continue;
         }
 
+        MSG_DUMP("recv:", recv_buf, len);
+
         if (user->rcvbuf == NULL) {
             parse_buf(user, recv_buf, len);
         } else {
+            if (user->rcvlen + len >= TCP_PACKET_MAX_LEN) {
+                mtc_mt_err("tcp package too long %zd %d", user->rcvlen, len);
+                poll_del(efd, fd);
+                close(fd);
+                user->room->state = ROOM_STATE_CLOSED;
+                continue;
+            }
+
             memcpy(user->rcvbuf + user->rcvlen, recv_buf, len);
-            user->rcvbuf += len;
+            user->rcvlen += len;
             parse_buf(user, user->rcvbuf, user->rcvlen);
         }
     }

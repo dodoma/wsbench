@@ -2,11 +2,10 @@
 
 #include <arpa/inet.h>
 
+#include "config.h"
 #include "parse.h"
 #include "url.h"
 #include "app.h"
-
-#define TCP_PACKET_MAX_LEN 1048576
 
 enum {
     OP_STREAM = 0,

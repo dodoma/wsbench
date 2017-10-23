@@ -1,20 +1,16 @@
 #include "reef.h"
 
+#include "config.h"
 #include "util.h"
 #include "site.h"
 #include "user.h"
 #include "poll.h"
 
-#define MAX_THREAD_NUM 100
-#define BUFFER_LEN 10240        /* receive message buffer */
-#define DEFAULT_CONFIGFILE "./config.json"
-
-MDF  *g_cfg = NULL;
-char *g_config_filename = NULL;
+MDF   *g_cfg = NULL;
+char  *g_config_filename = NULL;
+time_t g_ctime = 0;
 
 static bool dad_call_me_back = false;
-
-time_t g_ctime = 0;
 
 static void* _bench_do(void *arg)
 {

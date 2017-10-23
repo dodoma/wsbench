@@ -10,10 +10,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include "config.h"
 #include "url.h"
 #include "app.h"
-
-#define BUFFER_LEN 10240
 
 static int _connect(MDF *sitenode)
 {
@@ -21,16 +20,20 @@ static int _connect(MDF *sitenode)
 
     char *ip = mdf_get_value(sitenode, "server.ip", "127.0.0.1");
     int port = mdf_get_int_value(sitenode, "server.port", 0);
-    int timeout = mdf_get_int_value(sitenode, "server.timeout", 0);
 
-    mtc_mt_dbg("connect to %s %d %d", ip, port, timeout);
+    mtc_mt_dbg("connect to %s %d", ip, port);
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return -1;
 
+    /*
+     * 在游戏初始化和创建、加入房间阶段，使用同步socket通信, wsbench 会等待 server回包。
+     * 由于 server 对于一个请求可能会有多次回包，故在此设定每个请求的等待时间。
+     * 100 毫秒内，所有收到的数据，都是本次请求的回包。过完这100毫秒，再进行下一个请求。
+     */
     struct timeval tv;
-    tv.tv_sec = timeout;
-    tv.tv_usec = 0;
+    tv.tv_sec = 0;
+    tv.tv_usec = 100000;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(tv));
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char*)&tv, sizeof(tv));
 
@@ -60,6 +63,7 @@ bool site_request(char *uid, char *ticket, MDF *sitenode, int *fd, MDF *vnode)
 
     int wsfd = 0;
     int lfd = 0;
+    int maxretry = mdf_get_int_value(sitenode, "server.timeout", 1) * 10;
     int retry = 0;
 
     /* TODO do this by js in config file */
@@ -79,7 +83,6 @@ bool site_request(char *uid, char *ticket, MDF *sitenode, int *fd, MDF *vnode)
         char *resp    = mdf_get_value(cnode, "resp", NULL);
         char *payload = mdf_get_value(cnode, "payload", NULL);
         char *ps      = NULL;
-        char *stringp = NULL;
         MDF *save_var = mdf_get_node(cnode, "save_var");
 
         if (!req) return false;
@@ -134,7 +137,7 @@ bool site_request(char *uid, char *ticket, MDF *sitenode, int *fd, MDF *vnode)
         if (resp) {
         retry:
             memset(recv_buf, 0x0, BUFFER_LEN);
-            int len = app_recv(lfd, recv_buf, BUFFER_LEN, &stringp);
+            int len = app_recv(lfd, recv_buf, BUFFER_LEN);
             if (len == 0) {
                 mtc_mt_err("server closed connect");
                 return false;
@@ -143,8 +146,8 @@ bool site_request(char *uid, char *ticket, MDF *sitenode, int *fd, MDF *vnode)
                 return false;
             }
 
-            if (!url_var_save(vnode, resp, save_var, stringp)) {
-                if (retry++ <= 2) goto retry;
+            if (!url_var_save(vnode, resp, save_var, (char*)recv_buf)) {
+                if (retry++ < maxretry) goto retry;
 
                 mtc_mt_err("expect response failure %s %s", recv_buf, resp);
                 return false;
@@ -172,6 +175,7 @@ bool site_room_init(int fd, MDF *sitenode, MDF *roomnode, int usersn)
 {
     if (fd < 0 || !sitenode || !roomnode) return false;
 
+    int maxretry = mdf_get_int_value(sitenode, "server.timeout", 1) * 10;
     int retry;
 
     unsigned char recv_buf[BUFFER_LEN];
@@ -181,7 +185,6 @@ bool site_room_init(int fd, MDF *sitenode, MDF *roomnode, int usersn)
     while (cnode) {
         char *req     = mdf_get_value(cnode, "req", NULL);
         char *resp    = mdf_get_value(cnode, "resp", NULL);
-        char *stringp = NULL;
         MDF *save_var = mdf_get_node(cnode, "save_var");
 
         if (!req) return false;
@@ -193,7 +196,7 @@ bool site_room_init(int fd, MDF *sitenode, MDF *roomnode, int usersn)
         if (resp) {
         retry:
             memset(recv_buf, 0x0, BUFFER_LEN);
-            int len = app_recv(fd, recv_buf, BUFFER_LEN, &stringp);
+            int len = app_recv(fd, recv_buf, BUFFER_LEN);
             if (len == 0) {
                 mtc_mt_err("server closed connect");
                 return false;
@@ -202,8 +205,8 @@ bool site_room_init(int fd, MDF *sitenode, MDF *roomnode, int usersn)
                 return false;
             }
 
-            if (!url_var_save(roomnode, resp, save_var, stringp)) {
-                if (retry++ <= 2) goto retry;
+            if (!url_var_save(roomnode, resp, save_var, (char*)recv_buf)) {
+                if (retry++ < maxretry) goto retry;
 
                 mtc_mt_err("expect response failure %s %s", recv_buf, resp);
                 return false;
