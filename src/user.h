@@ -32,6 +32,7 @@ typedef struct _wb_user {
 } WB_USER;
 
 typedef struct _wb_room {
+    char *name;
     uint32_t turncount;
     uint32_t usercount;
     MDF *inode;                 /* room request information */
@@ -61,7 +62,9 @@ WB_ROOM* user_room_open(WB_ROOM *next, char *uid, char *ticket,
 bool user_room_add(WB_ROOM *room, char *uid, char *ticket,
                    MDF *sitenode, int usersn, int usernumber);
 
-void user_room_check(WB_ROOM *room, int efd);
+void user_room_check(WB_ROOM *room, int efd, int robo);
+bool user_room_over(WB_ROOM *room, int robo);
+void user_room_status_out(WB_ROOM *room);
 void user_room_destroy(WB_ROOM *room);
 
 void user_message_append(WB_USER *user, const char *req, int delay);

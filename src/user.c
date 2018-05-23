@@ -7,6 +7,26 @@
 
 extern time_t g_ctime;
 
+static char* _state_2_string(int state)
+{
+    switch (state) {
+    case ROOM_STATE_INIT:
+        return "初始化中";
+    case ROOM_STATE_READY:
+        return "准备完成";
+    case ROOM_STATE_RUNNING:
+        return "游戏进行中";
+    case ROOM_STATE_FAILURE:
+        return "游戏失败";
+    case ROOM_STATE_GAMEOVER:
+        return "游戏完成";
+    case ROOM_STATE_CLOSED:
+        return "服务端关闭";
+    default:
+        return "未知状态";
+    }
+}
+
 void _lmt_free(void *p)
 {
     if (!p) return;
@@ -75,6 +95,7 @@ WB_ROOM* user_room_open(WB_ROOM *next, char *uid, char *ticket,
     if (!user) return NULL;
 
     WB_ROOM *room = mos_calloc(1, sizeof(WB_ROOM));
+    room->name = mdf_get_value(sitenode, "name", "测试游戏");
     room->turncount = 0;
     room->usercount = 1;
     room->state = ROOM_STATE_INIT;
@@ -115,7 +136,7 @@ bool user_room_add(WB_ROOM *room, char *uid, char *ticket,
     return true;
 }
 
-void user_room_check(WB_ROOM *room, int efd)
+void user_room_check(WB_ROOM *room, int efd, int robo)
 {
     int fd;
     bool roomok;
@@ -123,8 +144,12 @@ void user_room_check(WB_ROOM *room, int efd)
 
     while (room) {
         roomok = true;
-        if (room->state == ROOM_STATE_READY ||
-            room->state == ROOM_STATE_FAILURE) {
+        if ( (robo == 0 || room->turncount < robo) &&
+             (room->state == ROOM_STATE_READY ||
+              room->state == ROOM_STATE_FAILURE ||
+              room->state == ROOM_STATE_CLOSED) ) {
+
+            room->turncount++;
 
             mdf_clear(room->inode);
 
@@ -164,7 +189,6 @@ void user_room_check(WB_ROOM *room, int efd)
 
             if (roomok) {
                 char *roomnumber = mdf_get_value(room->inode, "roomnumber", NULL);
-                room->turncount++;
 
                 mtc_mt_foo("room %s 第 %d 轮游戏，房间号 %s",
                            room->user->uid, room->turncount, roomnumber);
@@ -218,7 +242,11 @@ void user_room_check(WB_ROOM *room, int efd)
 
                 user = user->next;
             }
-            room->state = ROOM_STATE_READY;
+
+            /*
+             * 正常完成的游戏，只有在 robo = 0 时才进入下一轮，否侧已结束
+             */
+            if (robo == 0) room->state = ROOM_STATE_READY;
         } else if (room->state == ROOM_STATE_CLOSED) {
             mtc_mt_warn("room %s closed by server", room->user->uid);
 
@@ -232,8 +260,6 @@ void user_room_check(WB_ROOM *room, int efd)
 
                 user = user->next;
             }
-
-            room->state = ROOM_STATE_READY;
         }
 
         /*
@@ -249,6 +275,35 @@ void user_room_check(WB_ROOM *room, int efd)
                 user = user->next;
             }
         }
+
+        room = room->next;
+    }
+}
+
+bool user_room_over(WB_ROOM *room, int robo)
+{
+    /*
+     * retry onerror before over 为 0 时，永不停止
+     */
+    if (robo == 0) return false;
+
+    while (room) {
+        if (room->state == ROOM_STATE_INIT ||
+            room->state == ROOM_STATE_RUNNING ||
+            (room->state == ROOM_STATE_FAILURE && room->turncount < robo)) return false;
+
+        if (room->state == ROOM_STATE_READY) mtc_mt_warn("%s 怎么会是READY", room->name);
+
+        room = room->next;
+    }
+
+    return true;
+}
+
+void user_room_status_out(WB_ROOM *room)
+{
+    while (room) {
+        printf("%s %s\n", room->name, _state_2_string(room->state));
 
         room = room->next;
     }

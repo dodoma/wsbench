@@ -1,4 +1,10 @@
 {
+    // 初始化及游戏过程中出错 重试几次后还是出错，则
+    // 1. user_room_over() 返回为 true
+    // 2. 在 user_room_status_out() 判定该房间为失败
+    // 此配置项仅用作监控时防止误报，压测时请配置为 0
+    retry_onerror_before_over: 3,
+
     max_threadnum: 10,
     trace: {
         tostdout: true,

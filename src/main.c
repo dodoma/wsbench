@@ -24,6 +24,8 @@ static void* _bench_do(void *arg)
     mtc_mt_init(fname, mtc_level_str2int(mdf_get_value(g_cfg, "trace.level", "debug")));
     mtc_mt_dbg("I am bencher %d", threadsn);
 
+    int robo = mdf_get_int_value(g_cfg, "retry_onerror_before_over", 0);
+
     WB_ROOM *wb_room;
     MDF *cnode, *sitenode;
 
@@ -80,7 +82,12 @@ static void* _bench_do(void *arg)
     }
 
     while (!dad_call_me_back) {
-        user_room_check(wb_room, efd);
+        user_room_check(wb_room, efd, robo);
+
+        if (user_room_over(wb_room, robo)) {
+            user_room_status_out(wb_room);
+            dad_call_me_back = true;
+        }
 
         poll_do(efd, events, recv_buf, BUFFER_LEN);
     }
@@ -125,15 +132,15 @@ int main(int argc, char *argv[])
 
     printf("wsbench running. 'q' to exit.\n");
 
-    while (1) {
+    while (!dad_call_me_back) {
         if (kbdhit()) {
             char c = getchar();
 
             if (c == 'q') {
                 dad_call_me_back = true;
-                break;
             }
         }
+
         g_ctime = time(NULL);
     }
 
